@@ -16,3 +16,5 @@ The picture below displays the main command and data flows of a trajectory
 execution by agimus.
 ![ROS topics, services and CORBA requests](figures/event-flow.png)
 
+The picture below displays the same event and data flow, but along a timeline.
+![ROS topics, services and CORBA requests](figures/timeline.png)
