@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<package format="2">
+  <name>agimus_doc</name>
+  <version>0.0.0</version>
+  <description>The documentation of Agimus software</description>
+
+  <maintainer email="florent.lamiraux@laas.fr">Florent Lamiraux</maintainer>
+
+  <license>BSD</license>
+
+
+  <!-- Url tags are optional, but multiple are allowed, one per tag -->
+  <!-- Optional attribute type can be: website, bugtracker, or repository -->
+  <!-- Example: -->
+  <!-- <url type="website">http://wiki.ros.org/agimus_demos</url> -->
+
+  <author email="florent.lamiraux@laas.fr">Florent Lamiraux</author> 
+
+  <buildtool_depend>catkin</buildtool_depend>
+  <build_depend>agimus-sot</build_depend>
+  <build_depend>agimus-hpp</build_depend>
+  <build_depend>agimus</build_depend>
+  <build_depend>agimus_demos</build_depend>
+  <build_depend>hpp-manipulation-corba</build_depend>
+
+  <!-- The export tag contains other, unspecified, tags -->
+  <export>
+    <!-- Other tools can request additional information be placed here -->
+
+  </export>
+</package>
