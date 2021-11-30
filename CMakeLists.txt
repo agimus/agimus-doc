@@ -40,7 +40,6 @@ project(${PROJECT_NAME} ${PROJECT_ARGS})
 ADD_DOC_DEPENDENCY (agimus-sot)
 ADD_DOC_DEPENDENCY (agimus-hpp)
 ADD_DOC_DEPENDENCY (agimus)
-ADD_DOC_DEPENDENCY (agimus_demos)
 ADD_DOC_DEPENDENCY (hpp-manipulation-corba)
 
 CONFIGURE_FILE (doc/main-page.hh.in ${CMAKE_BINARY_DIR}/doc/main-page.hh
