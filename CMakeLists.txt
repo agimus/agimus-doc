@@ -40,9 +40,17 @@ project(${PROJECT_NAME} ${PROJECT_ARGS})
 ADD_DOC_DEPENDENCY (agimus-sot)
 ADD_DOC_DEPENDENCY (agimus-hpp)
 ADD_DOC_DEPENDENCY (agimus)
+ADD_DOC_DEPENDENCY (sot-doc)
+ADD_DOC_DEPENDENCY (sot-core)
 ADD_DOC_DEPENDENCY (hpp-manipulation-corba)
 
-CONFIGURE_FILE (doc/main-page.hh.in ${CMAKE_BINARY_DIR}/doc/main-page.hh
+CONFIGURE_FILE (doc/overview.md.in ${CMAKE_BINARY_DIR}/doc/overview.md
+  @ONLY)
+CONFIGURE_FILE (doc/tutorial_sot.md.in ${CMAKE_BINARY_DIR}/doc/tutorial_sot.md
+  @ONLY)
+CONFIGURE_FILE (doc/tutorial_agimus.md.in ${CMAKE_BINARY_DIR}/doc/tutorial_agimus.md
+  @ONLY)
+CONFIGURE_FILE (doc/tutorial_gepetto-gui.md.in ${CMAKE_BINARY_DIR}/doc/tutorial_gepetto-gui.md
   @ONLY)
 CONFIGURE_FILE (doc/figures/talos-manipulate-boxes-geometric-simu.launch.dot.in
   ${CMAKE_BINARY_DIR}/doc/figures/talos-manipulate-boxes-geometric-simu.launch.dot

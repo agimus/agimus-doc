@@ -1,2 +1,7 @@
-INPUT = @CMAKE_SOURCE_DIR@/doc @CMAKE_BINARY_DIR@/doc
+INPUT = @CMAKE_SOURCE_DIR@/doc/main.dox \
+      @CMAKE_BINARY_DIR@/doc/overview.md \
+      @CMAKE_BINARY_DIR@/doc/tutorial_agimus.md \
+      @CMAKE_BINARY_DIR@/doc/tutorial_sot.md \
+      @CMAKE_BINARY_DIR@/doc/tutorial_gepetto-gui.md \
+      
 DOTFILE_DIRS=@CMAKE_BINARY_DIR@/doc/figures

@@ -1,0 +1,324 @@
+# Control of a UR10 robot using the Stack of Tasks {#tutorial_sot}
+
+## Introduction
+
+This tutorial explains how to control the stack of tasks running in roscontrol
+on a UR10 robot.
+
+It is assumed that:
+
+1. the stack of tasks is installed either from binary packages or from source,
+2. `sot-universal-robot` is installed (no binary package yet available).
+
+## Starting the Stack of Tasks within roscontrol
+
+To start simulating `roscontrol` running in the UR10 robot in Gazebo, type the following command in a terminal:
+```
+    roslaunch agimus_demos ur10_pointing_simulation.launch
+```
+
+You should see the following window.
+
+<div class="image">
+<img src="roscontrol-ur10-gazebo.png" alt="" width="50%"/>
+<div class="caption">
+UR10 robot controlled by `roscontrol` simulated in Gazebo</div></div>
+
+In this application, gazebo simulates UR10 robot controlled by `roscontrol`. The next step consists in loading the SoT controller into `roscontrol`. To do so, type in another terminal:
+```
+    roslaunch sot_universal_robot controller.launch simulation:=true
+```
+You should see 2 lines like
+```
+    [INFO] [1658753202.754842, 16.418000]: Controller Spawner: Loaded controllers: sot_controller
+    [INFO] [1658753202.786559, 16.439000]: Started controllers: sot_controller
+```
+meaning that the Stack of Task has been loaded by `roscontrol` and that the controller has been started. Every control period, `roscontrol` asks the Stack of Tasks (`sot_controller`) for a reference position of the 6 axes of the robot and controls the robot around this reference configuration.
+
+## Controlling the robot with the Stack of Tasks
+
+### Very brief description of the Stack of Tasks
+
+The <a href="@SOT_DOC_DATAROOTDIR@/doc/sot-doc/doxygen-html/index.html">Stack of Task</a> is a realtime control framework written in C++, controlled via python, based on the computation of the robot control input by a *control graph*.
+
+The nodes of the graph are called *entities*. Entities compute the values of output signals from input signals.
+
+The edges of the graph are *signals* that convey data of different types: floating point numbers, integers, vectors, matrices,... Each signal has an integer member called *time*.
+
+When the value of an output signal at a given time `t` is requested, the entity owning the signal first asks for the values at time `t` of the input signals the output signal depends on. If the value of a signal at a time not greater than the latest time for which the signal has been computed is requested, no computation is performed. The latest computed value of the signal is returned.
+
+Two entities are always present in a control graph:
+  - an entity of type `Device` or derived class makes the connection with the hardware. The output signal `state` of this entity is sent to the robot control system as the reference configuration of the robot. The input signal called `control` represents the reference velocity and is computed by the graph at each time period.
+
+  - an entity of type `DynamicPinocchio` that computes the forward kinematics of the robot at each time step. The output signals of this entity are the pose and associated Jacobians of selected joints and frames defined in the URDF description of the robot.
+  
+![The input signal `control` of entity `device` is the desired velocity. This velocity is integrated into output signal `device`.state and sent as the reference configuration of the robot.](figures/device.svg)
+
+### Integration into roscontrol
+
+The Stack of Task is integrated in roscontrol via a plugin called `librcsot_controller.so`. The plugin is loaded into roscontrol with the following lines
+```
+<!-- Spawn sot controller -->
+  <node name="sot_controller_spawner"
+        pkg="controller_manager" type="spawner" output="screen"
+        args="sot_controller" />
+```
+in launch file `controller.launch` of package `sot_universal_robot`.
+
+At startup, `sot_controller` simply reads the encoder values and sends this constant position as a reference configuration. Hence, the robot remains static.
+
+After calling ROS service `/start_dynamic_graph`, `sot_controller` reads input signal `control` of the `device` entity.
+
+If we call `/start_dynamic_graph` before initializing `control` signal, `sot_controller` will raise an exception and gazebo will stop.
+
+### Communicating with the Stack of Tasks via Python
+
+To control the stack of tasks via python, type in a bash terminal the following command:
+```
+    rosrun dynamic_graph_bridge run_command
+```
+This will open a python channel with the python interpreter embedded in the Stack of Tasks. All the commands typed in this terminal are sent to the remote interpreter and the result is received and displayed in the terminal.
+
+In the terminal, type the following commands:
+```
+    import numpy
+    u = numpy.zeros(6)
+    u[0] = .01
+    robot.device.control.value = u
+```
+Then in another bash terminal, type
+```
+    rosservice call /start_dynamic_graph
+```
+The latter command asks the `sot_controller` to start taking into account
+signal `robot.device.control` to compute the reference configuration of the
+robot.
+
+As a consequence, you should see the robot moving the first axis in Gazebo.
+
+To stop the motion, type the following commands in the remote python terminal:
+```
+    u = numpy.zeros(6)
+    robot.device.control.value = u
+```
+
+### A simple control graph
+
+In this section, we will create a simple control graph, that is a graph
+that computes the value of the control signal by evaluating an error depending
+on the state of the robot. Let us assume we want to reach configuration
+```
+    q_goal = [pi/6, -pi/2, pi/2, 0, 0, 0,]
+```
+We will first create an entity that will substract this value to the robot state
+signal to compute the error:
+```
+    from math import pi
+    from dynamic_graph import plug
+    from dynamic_graph.sot.core.operator import Substract_of_vector
+    error = Substract_of_vector('error')
+    plug(robot.device.state, error.sin1)
+    error.sin2.value = numpy.array([pi/6, -pi/2, pi/2, 0, 0, 0,])
+```
+Then we will multiply this error by a negative gain that we will plug into
+the device control signal:
+```
+    from dynamic_graph.sot.core.operator import Multiply_double_vector
+    control = Multiply_double_vector('control')
+    control.sin1.value = -0.01
+    plug(error.sout, control.sin2)
+    plug(control.sout, robot.device.control)
+```
+After typing the last line, the robot starts moving to the desired
+configuration. To display the current configuration, type:
+```
+    robot.device.state.value
+```
+To display the current error, type:
+```
+    error.sout.value
+```
+To make the robot converge faster, you can change the gain:
+```
+    control.sin1.value = -0.1
+```
+It is also possible to display the graph in format dot:
+```
+    from dynamic_graph import writeGraph
+    writeGraph('/tmp/graph.dot')
+```
+Then in a bash terminal:
+```
+    cd /tmp
+    dot -T svg -o graph.svg graph.dot
+```
+This will produce a svg file representing the control graph as below
+
+![Very simple control graph.](figures/simple-control-graph.svg)
+
+### Performing inverse kinematics
+
+In the previous example, we created a control graph that directly controls the robot configuration. In most applications however, it is more relevant to control the pose of the end-effector. We propose here a control graph that does so.
+
+Although not compulsory, it is recommended to stop and restart the two `roslaunch` commands started in the introduction section.
+
+We are going to control the camera frame of the robot attached to the last link of the robot. Note that "camera_color_optical_frame" is defined in the URDF model of the robot.
+
+```
+from dynamic_graph.sot.core.feature_pose import FeaturePose
+fp = FeaturePose("feature_camera")
+```
+
+A `FeaturePose` object is an object that computes
+  - the error on the relative pose between two frames,
+  - the Jacobian matrix of this error with respect to the robot configuration.
+The two frames are denoted
+  - Fa attached to joint Ja, and
+  - Fb attached to joint Jb.
+
+Let us now display the signals of this object:
+```
+for s in fp.signals():
+    print(s.name)
+ 
+sotFeatureAbstract(feature_camera)::output(uint)::dim
+sotFeatureAbstract(feature_camera)::output(vector)::error
+sotFeatureAbstract(feature_camera)::output(vector)::errordot
+FeaturePose(feature_camera)::output(matrixHomo)::faMfb
+FeaturePose(feature_camera)::input(matrixHomo)::faMfbDes
+FeaturePose(feature_camera)::input(vector)::faNufafbDes
+FeaturePose(feature_camera)::input(matrix)::jaJja
+FeaturePose(feature_camera)::input(matrixHomo)::jaMfa
+sotFeatureAbstract(feature_camera)::output(matrix)::jacobian
+FeaturePose(feature_camera)::input(matrix)::jbJjb
+FeaturePose(feature_camera)::input(matrixHomo)::jbMfb
+FeaturePose(feature_camera)::input(matrixHomo)::oMja
+FeaturePose(feature_camera)::input(matrixHomo)::oMjb
+sotFeatureAbstract(feature_camera)::input(flag)::selec
+```
+The output signals are
+  - `dim`: the dimension of the error vector, here 6,
+  - `error`: a vector representing the pose error between the frames. The error is equal to 0 if and only if the relative pose between frames Fa and Fb is the desired one (defined by the input signals as explained below),
+  - `errordor`: derivative of the error if no control is applied to the robot. It is different from 0 if one of the frames move with respect to time,
+  - `jacobian`: Jacobian of the error with respect to the robot configuration,
+  - `faMfb`: relative pose of Fb in frame Fa.
+  
+The input signals are
+  - `faMfbDes`: desired relative pose of Fb with respect to Fa,
+  - `faNufafbDes`: time derivative of the above, in case one of the frames moves with time,
+  - `jaJja`: Jacobian of joint Ja with respect to robot configuration,
+  - `jaMfa`: pose of frame Fa in joint Ja,
+  - `jbJjb`: Jacobian of joint Jb with respect to robot configuration,
+  - `jbMfb`: pose of frame Fb in joint Jb,
+  - `oMja`: pose of joint Ja in world frame,
+  - `oMjb`: pose of jointjb in world frame.
+
+
+Then, the following instruction will ask entity `robot.dynamic` to add
+  - a signal with the pose of the camera frame named "camera_color_optical_frame",
+  - a signal with the Jacobian of this pose with respect to the robot configuration, named "Jcamera_color_optical_frame".
+
+```
+camera_frame = "camera_color_optical_frame"
+robot.dynamic.createOpPoint(camera_frame, camera_frame)
+```
+This frame will be the frame Fa of the `FeaturePose` entity.
+
+```
+from dynamic_graph import plug
+plug(robot.dynamic.signal('camera_color_optical_frame'), fp.signal('oMja'))
+plug(robot.dynamic.signal('Jcamera_color_optical_frame'), fp.signal('jaJja'))
+```
+For simplicity, we set frame `Fa` to be the same as joint `Ja`.
+```
+import numpy
+fp.signal('jaMfa').value = numpy.identity(4)
+```
+We then set `Jb` to be the world frame.
+```
+fp.signal('oMjb').value = numpy.identity(4)
+fp.signal('jbJjb').value = numpy.zeros([6, robot.dynamic.getDimension()])
+```
+and we define a reference for `Fb`.
+```
+M = numpy.array([[0 ,0,1,0.8],
+                 [0 ,1,0,0.0],
+                 [-1,0,0,1. ],
+                 [0 ,0,0,1. ]])
+fp.signal('jbMfb').value = M
+```
+Then, we specify that we want frames `Fa` and `Fb` to be at the same pose
+```
+fp.signal('faMfbDes').value = numpy.identity(4)
+fp.signal('faNufafbDes').value = numpy.zeros(6)
+```
+We will now insert our feature into a task. A task may be composed of several features that need to be regulated with the same level of priority.
+```
+from dynamic_graph.sot.core.task import Task
+t = Task('task_camera')
+t.add(fp.name)
+t.signal('controlGain').value = .1
+```
+Then, we will create a hierarchical solver that regulates several tasks with different levels of priority.
+```
+from dynamic_graph.sot.core.sot import SOT
+sot = SOT('sot')
+sot.setSize(robot.dynamic.getDimension())
+sot.push(t.name)
+```
+Then, we can plug the control signal of the SOT instance to the input of the device
+```
+plug(sot.signal('control'), robot.device.signal('control'))
+```
+
+Again, to activate the control graph, run command
+```
+rosservice call /start_dynamic_graph
+```
+in a bash terminal.
+
+Displaying the control graph gives the following figure.
+
+![Inverse kinematics.](figures/inverse-kinematics.svg)
+
+#### Notes
+
+  - Depending on the initial configuration of the robot, the robot will converge to a configuration that make the error converge to 0. Failure may happen due essentially to two different reasons:
+    1. the robot hits a joint limit,
+    2. the robot reaches a local minimum of the norm of the error.
+  - It is of course not recommended to execute the above commands on the real robot.
+
+## Plotting some signals
+
+It is possible to plot some signals and to display them using for instance `gnuplot`. To do so, before calling service `start_dynamic_graph`, type the following commands in the remote python interperter.
+```
+robot.initializeTracer()
+robot.tracer.setBufferSize(2**24)
+robot.addTrace(t.name, 'error')
+robot.addTrace(robot.device.name, 'state')
+robot.addTrace(robot.device.name, 'control')
+
+robot.startTracer()
+```
+
+Then, to stop and dump the plots in directory `/tmp`, type
+
+```
+robot.stopTracer()
+```
+
+Then in a bash terminal, start gnuplot in directory `/tmp`
+```
+cd /tmp
+gnuplot
+```
+Then you can trace the error values:
+```
+gnuplot> error = 'dg_task_camera-error.dat'
+gnuplot> state = 'dg_UniversalRobot-state.dat'
+gnuplot> control = 'dg_UniversalRobot-control.dat'
+gnuplot> plot error u 1:2 w l, error u 1:3 w l, error u 1:4 w l, error u 1:5 w l, error u 1:6 w l, error u 1:7 w l
+```
+A window with some plots should appear as below.
+
+![Plot of Sot signals.](figures/gnuplot.png)

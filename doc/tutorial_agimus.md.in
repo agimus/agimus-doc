@@ -1,0 +1,161 @@
+# Control of a UR10 robot using agimus {#tutorial_agimus}       
+
+In this tutorial, we will let `agimus-sot` build the control graph in the
+Stack of Tasks.
+
+Open several terminals (or several tabs in a terminal) and go into directory
+`agimus-demos/ur10/pointing`.
+
+## Starting the simulation, the motion planner and the graphical interface
+
+In terminal 1, start the simulation in Gazebo specifying a simpler part: a vertical plank with a chessboard on one side and an apriltag on the other side.
+
+```
+roslaunch agimus_demos ur10_pointing_simulation.launch part:=april-tag-plank part_pose:="-x 1.3 -y -0.15 -z 0 -Y 3.141592653589793"
+```
+Argument `part_pose` specifies the pose of the part in the simulator: translation of 1.3 m along x, -15 cm along y, and rotation of pi around z axis (Y stands for yaw).
+
+In terminal 2, start `hpp`:
+```
+hppcorbaserver
+```
+In terminal 3,
+```
+gepetto-gui
+```
+In `script_hpp.py` replace the following line
+```
+UseAprilTagPlank = False
+```
+by
+```
+UseAprilTagPlank = True
+```
+then execute the script in terminal 4.
+```
+python -i script_hpp.py
+```
+After a while, a view should appear in `gepetto-gui`. After Clicking on
+<div class="image">
+<img src="zoom-fit-best.png" alt="" width="24" align="left"/>
+</div>
+<br></br>
+
+and moving the camera with the mouse, you should see something like:
+<div class="image">
+<img src="gepetto-gui-april-tag-plank.png" alt="" width="50%"/>
+<div class="caption">
+gepetto-gui</div>
+</div>
+
+You can go now to <a href="tutorial_gepetto-gui.html">this page</a> to know how to use `gepetto-gui`.
+
+## Building a control graph with agimus-sot
+
+In terminal 5, start agimus
+```
+roslaunch agimus_demos ur10_pointing_demo.launch simulation:=true part:=april-tag-plank
+```
+
+In terminal 6
+```
+rosrun dynamic_graph_bridge run_command
+```
+and then
+```
+from dynamic_graph import writeGraph
+writeGraph('/tmp/control-graph.dot')
+```
+This will create a dot file corresponding to the following graph.
+<div class="image">
+  <a href="apriltag-plank-control-graph.svg"><img src="apriltag-plank-control-graph.png" alt="" width="100%"/></a>
+  <div class="caption">
+    Stack of Tasks control graph built by agimus-sot. Click to enlarge.</div></div>
+  </div>
+</div>
+
+## The control graph explained
+
+Let us explain the components of this control graph.
+
+  - `UniversalRobot` is the `Device` entity that make the interface to the hardware. It is also accessible in the remote python interpreter via `robot.device`.
+  - `ur_dynamic` is the entity of type `DynamicPinocchio` that computes the forward kinematics of the robot.
+  - Entity `sot_supervisor_switch` selects among many input signals one that is provided as output. The output signal `sout` is plugged to the input signal `control` of the device. This entity is aimed as selecting the controller depending on the transition of the constraint graph that is active.
+  - All entities with a name starting with `sot_` are controllers of type `SOT` as the one we defined in <a href="tutorial_sot.html"> tutorial "Control of a UR10 robot using the Stack of Tasks"</a>. Note that `sot_keep` is the controller active when no trajectory is executed.
+  - All entities with a name starting with `preAction_` correspond to entities of type `SOT` that are aimed at controlling an action that takes place before a transition. For instance closing a gripper before grasping an object.
+  - All entities with a name starting with `postAction_` correspond to entities of type `SOT` that are aimed at controlling an action that takes place after a transition. For instance opening a gripper after putting an object on a contact surface.
+  - `ros_tf_listener` is an entity listening to ROS tf and transforming relative transforms between frames into homogeneous matrices. For each requested relative transform, two signals are created. In the present case, `part/base_link_measured` is the relative transform between the camera and the part as published in ROS tf by the software that performs part localization. `part/base_link_measured_available` is a Boolean signal that is true when the latest publication of the relative transform is not older than a given timeout.
+  - `part_base_link_measuredwrt_world_ol` is an entity of type `ObjectLocalization`. This entity provides the pose of the object in the world frame as follows. Upon request, and if the relative pose of the object with respect to the camera frame is available from ROS tf, the entity records the later relative pose and the pose of the camera in the world frame provided by entity `ur_dynamic` via signal `camera_color_optical_frame`. The output signal `cMo` then computes the pose of the object with respect to the camera frame under the hypothesis that the object is static using the new pose of the camera in the world frame `camera_color_optical_frame` that is updated every time period of the control loop.
+  - `part/base_link_measured_wrt_world` is a multiplication of homogeneous matrices. The output signal `sout` thus provides the estimated pose of the object in the world frame.
+  - `ros_queue_subscribe` is an entity of type `RosQueuedSubscribe`. This entity receives the reference trajectories of the various tasks (pose of an effector with respect to an object, reference posture,...) from HPP. Upon request, these values are send to this entity that stores each of them in queues from where they are extracted by computation of the corresponding output signal value.
+  - `pregrasp___ur10e/gripper___part/handle_00_oMjaDes_inv` is an entity that coputes the inverse of an homogeneous matrix.
+  - `pregrasp___ur10e/gripper___part/handle_00_faMfbDes` is an entity that computes the product between two homogeneous matrices. The output of this entity is thus the (time varying) desired relative pose of the handle with respect to the tooltip.
+  - `pregrasp___ur10e/gripper___part/handle_00_feature` is an entity of type `FeaturePose` as the one we created in <a href="tutorial_sot.html"> tutorial "Control of a UR10 robot using the Stack of Tasks"</a>.
+  - `pregrasp___ur10e/gripper___part/handle_00_task` is an entity of type `Task` that contains the previous feature. This task is inserted with the highest priority into all instances of type `SOT` that require to control the relative pose of the tootip with respect to the object.
+  - `done_control_norm` is an entity computing the norm of the control signal.
+  - `done_control_comparison` is an entity comparing the later norm to a threshold and exporting true to signal `sout` if this norm is lower than the threshold.
+  - `done_time` is an entity with an Boolean output signal called "after" that turns to True when the computation time of the signal becomes bigger than an internal time. The internal time is set with command setTime. The internal time is set to the current time plus the duration of the trajectory to follow.
+  - All entities with a name starting with "ade_" are logical and entities. Their output signals is True when the norm of the control signal is smaller than the threshold and the duration of the current trajectory to follow has elapsed.
+  - `done_switch` is a Switch entity (see `sot_supervisor_switch`).
+  - `done_event` is an Entity of type <a href="@SOT_CORE_DATAROOTDIR@/doc/sot-core/doxygen-html/classdynamicgraph_1_1sot_1_1Event.html">Event</a>. When the input signal turns to True, the entity publishes the current SoT time to topic `/agimus/sot/event/done`.
+
+## Planning and executing a motion
+
+To plan a path where the tooltip of the robot comes to contact with the center of the Apriltag, in terminal 4, type
+
+```
+pg.planPointingPathForHole(0)
+```
+This should plan 3 paths. The latest one is correctly time parameterized and can be executed on the robot. You can display the path in `gepetto-gui`.
+
+Note that the following lines in `script_hpp.py` plan a path for a pose of the object different from the pose defined in the simulator: the translation along y is 0 instead of 15cm.
+```
+if UseAprilTagPlank:
+    # Initial configuration of AprilTagPlank
+    q0[r:r+7] = [1.3, 0, 0, 0, 0, -1, 0]
+```
+
+To launch execution of the selected path, type the following command in terminal 7.
+```
+rosrun agimus rqt_path_execution
+```
+The following widget should pop up.
+![path execution widget](figures/rqt-path-execution.png)
+
+Select "Level 3" and "Path id 2" as in the Figure above. "Level 3" will let you decompose the motion into several steps.
+
+Make gazebo window visible to see the robot moving.
+
+To execute the motion, click on "Execute path" and on "Execute one step" each time the button becomes active, until the robot tootip is in front of the Apriltag.
+
+Then we will simulate part localization by typing the following command in terminal 8.
+
+```
+rosrun tf static_transform_publisher 1.4883 -0.202579  0.316413 -0.677875014659379 -0.19482811358312602 0.6799871058424646 0.20036218841432174 camera_color_optical_frame part/base_link_measured  10
+```
+
+This will publish a constant relative pose between the camera and the part.
+
+You can control that the pose of the part in the world frame is well updated by typing in terminal 9:
+
+```
+rosrun tf tf_echo world part/base_link_measured
+```
+You should repeatedly read something like
+```
+At time 184.879
+- Translation: [1.300, -0.149, -0.000]
+- Rotation: in Quaternion [0.000, 0.000, 1.000, -0.000]
+            in RPY (radian) [0.000, -0.000, -3.142]
+            in RPY (degree) [0.000, -0.001, -179.999]
+```
+
+In gazebo, orient the view and zoom in order to better see the relative pose of the tooltip with respect to the object as on the figure below (be patient, gazebo is not very reactive. Left button to move the view, middle button to zoom, right button to rotate)
+<div class="image">
+  <img src="gazebo-pregrasp.png" alt="" width="70%"/>
+  <div class="caption">
+    The tooltip is in front of the Apriltag and misaligned
+  </div>
+</div>
+
+You can click again on "Execute one step". You should observe the tooltip getting aligned with the part and the pointing motion reach the middle of the Apriltag.

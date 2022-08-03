@@ -1,0 +1,18 @@
+\page page_overview Overview
+
+# Introduction
+
+`Agimus` is a framework aimed at integrating motion planning and
+motion control of manipulation tasks for a wide variety of robots.
+The computation pipeline is composed of several steps
+
+  - A motion is planned based on a model of the robot, environment and objects to grasp, the result is a sequence of manipulation motions. Along each segment of the motion, a set of constraints is active (object grasped by a gripper, object still in a stable pose). This step is performed by the software platform <a href="https://humanoid-path-planner.github.io/hpp-doc">HPP</a> (Humanoid Path Planner), running in an executable that implements a CORBA server. To trigger path planning and get solution paths, a <a href="@HPP_MANIPULATION_CORBA_DATAROOTDIR@/doc/hpp-manipulation-corba/doxygen-html/index.html">CORBA client</a> is run in a ROS node.
+  - For each segment of the motion, a controller is created in the Stack of Tasks framework. This step is produced by package <a href="@AGIMUS_SOT_DATAROOTDIR@/doc/agimus-sot/doxygen-html/index.html">`agimus-sot`</a>. Reference motions for each task is extracted from the planned trajectory by <a href="@AGIMUS_HPP_DATAROOTDIR@/doc/agimus-hpp/doxygen-html/index.html">agimus-hpp</a>.
+  - A finite state machine switch from one controller to the next one.  This finite state machine is implemented in package <a href="@AGIMUS_DATAROOTDIR@/doc/agimus/doxygen-html/index.html">`agimus`</a>.
+
+# Workflow
+
+The picture below displays the main command and data flows of a trajectory
+execution by agimus.
+![ROS topics, services and CORBA requests](figures/event-flow.png)
+
