@@ -1,0 +1,77 @@
+# Using gepetto-gui {#tutorial_gepetto-gui}
+
+## Introduction
+
+This tutorial explains how to use `gepetto-gui`. We assume that you come from the page entitled "Control of a UR10 robot using agimus".
+
+`gepetto-gui` is a graphical user interface displaying 3D models based on openscenegraph, with controls like menus and buttons based on Qt.
+
+### View
+
+The connection to various applications is performed via a CORBA interface. The connection between python and `gepetto-gui` in  `script_hpp.py` is created by command:
+```
+v = vf.createViewer()
+```
+
+When clicking on menu item "Window->Body Tree", a widget called "Body tree" appears. This widget display the tree view of the scene you can select an element in this tree view by clicking on it. You can also select elements by clicking in the view.
+
+![Body tree](gepetto-gui-body-tree.png)
+
+When an element is selected, you can control the appearance of this element: transparency (Alpha), transparency,...
+
+### Controller
+
+Various menu items and buttons send CORBA requests to `hppcorbaserver`. To initialize the connection to `hppcorbaserver`,  click in menu "Tools->Reset connections" and then in "Tools->Refresh". Note that these actions are also accessible by icons in the toolbar.
+
+### Note
+
+By typing "h" when the view is selected displays some help on the keyboard shortcuts.
+
+## Displaying grippers and handles
+
+In HPP, grasps are defined by frames attached to robots and objects called "grippers" and "handle" respectively.
+
+To display the grippers, click on "Draw grippers frames" in the toolbar. After zooming on the robot tooltip, you should see a frame displayed as below.
+<div class="image">
+<img src="gripper-frame.png" alt="" width="50%"/>
+</div>
+<br></br>
+
+To display the handles, click on "Draw handles frames" in the toolbar. After zooming on the apriltag stuck on the plank, you should see another frame as below.
+<div class="image">
+<img src="handle-frame.png" alt="" width="50%"/>
+</div>
+<br></br>
+
+## Displaying the constraint graph
+
+By clicking on menu item "Window->Constraint graph" a blank window named "constraint graph" appears. After clicking on "Show waypoints" and "Refresh", you should see the following figure.
+<div class="image">
+  <img src="gepetto-gui-constraint-graph.png" width="75%" alt=""/>
+  <div class="caption">
+    The constraint graph
+  </div>
+</div>
+
+This graph is composed of 3 regular states and 1 waypoint state. As there are 1 gripper and 1 handle, the 2 main states of the system are
+  - "free" when the no constraint is applied,
+  - "ur10e/gripper grasps part/handle_00" when the gripper and handle coincide. From a theoretical point of view, this state represents a grasp although the robot can obviously not grasp the plank with the tooltip. we use grippers and handle to define pointing tasks.
+
+State "look-at-part" has been added to define an alignment task of the camera with the chessboard in order to perform hand-eye calibration. State "ur10e/gripper > part/handle_00 | f_pregrasp" is a waypoint state where the tooltip is a few centimeters in front of the apriltag.
+
+You can select states (or nodes) and edges by left clicking on them in the "Constraint graph window".
+
+You can also generate configurations in neighbor states as follows:
+  1. click on icon "Fetch configuration" in the toolbar, you should see state "free" becoming green, this action gets the current configuration of the robot in `hppcorbaserver` and sets it as the current configuration of `gepetto-gui` (independent from the configuration displayed in the view),
+  2. right click on edge "ur10e/gripper > part/handle_00 | f_01" and select "Extend current config to random config". In case of failure, you may need to repeat the action several times. You should see the robot with the tooltip in front of the apriltag in the view.
+  3. click on icon "Send configuration" in the toolbar. This action sends the current configuration of `gepetto-gui` to `hppcorbaserver`.
+  4. right click on edge "ur10e/gripper > part/handle_00 | f_12" and select "Extend current config to random config". In case of failure, you may need to repeat the action several times. You should see the robot with the tooltip touching the center of the apriltag in the view.
+
+You can now return to tutorial "Control of a UR10 robot using agimus".
+
+## Displaying a path
+
+Once some paths have been planned by `HPP`, it is possible bo display them using the "Path Player". To do so, in menu "Window", select "Path Player". You should see a window as below.
+![Path player](figures/path-player.png)
+
+Paths planned by `HPP` are stored in a vector. If this vector is not empty, by clicking on the refresh button, you should see the latest path id displayed. In the figure above, there are 3 paths planned. To display a path, click on button "Play". To select another path id, use the up and down arrows.
