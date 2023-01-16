@@ -44,6 +44,8 @@ ADD_DOC_DEPENDENCY (sot-doc)
 ADD_DOC_DEPENDENCY (sot-core)
 ADD_DOC_DEPENDENCY (hpp-manipulation-corba)
 
+CONFIGURE_FILE (doc/main-page.hh.in ${CMAKE_BINARY_DIR}/doc/main-page.hh
+  @ONLY)
 CONFIGURE_FILE (doc/overview.md.in ${CMAKE_BINARY_DIR}/doc/overview.md
   @ONLY)
 CONFIGURE_FILE (doc/tutorial_sot.md.in ${CMAKE_BINARY_DIR}/doc/tutorial_sot.md
