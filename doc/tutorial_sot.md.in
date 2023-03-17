@@ -26,7 +26,7 @@ UR10 robot controlled by `roscontrol` simulated in Gazebo</div></div>
 
 In this application, gazebo simulates UR10 robot controlled by `roscontrol`. The next step consists in loading the SoT controller into `roscontrol`. To do so, type in another terminal:
 ```
-    roslaunch sot_universal_robot controller.launch simulation:=true
+    roslaunch sot_universal_robot controller.launch simulation:=true robot:=ur
 ```
 You should see 2 lines like
 ```
