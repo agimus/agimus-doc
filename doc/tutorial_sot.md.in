@@ -47,13 +47,6 @@ The edges of the graph are *signals* that convey data of different types: floati
 
 When the value of an output signal at a given time `t` is requested, the entity owning the signal first asks for the values at time `t` of the input signals the output signal depends on. If the value of a signal at a time not greater than the latest time for which the signal has been computed is requested, no computation is performed. The latest computed value of the signal is returned.
 
-Two entities are always present in a control graph:
-  - an entity of type `Device` or derived class makes the connection with the hardware. The output signal `state` of this entity is sent to the robot control system as the reference configuration of the robot. The input signal called `control` represents the reference velocity and is computed by the graph at each time period.
-
-  - an entity of type `DynamicPinocchio` that computes the forward kinematics of the robot at each time step. The output signals of this entity are the pose and associated Jacobians of selected joints and frames defined in the URDF description of the robot.
-  
-![The input signal `control` of entity `device` is the desired velocity. This velocity is integrated into output signal `device`.state and sent as the reference configuration of the robot.](figures/device.svg)
-
 ### Integration into roscontrol
 
 The Stack of Task is integrated in roscontrol via a plugin called `librcsot_controller.so`. The plugin is loaded into roscontrol with the following lines
@@ -81,25 +74,30 @@ This will open a python channel with the python interpreter embedded in the Stac
 
 In the terminal, type the following commands:
 ```
-    import numpy
-    u = numpy.zeros(6)
-    u[0] = .01
-    robot.device.control.value = u
+import numpy
+u = numpy.zeros(6)
+robot.integrator.signal("velocity").value = u
 ```
-Then in another bash terminal, type
+In order to set the velocity control to zero. This is required before switching
+the stack of Tasks on with the following command in a bash terminal:
 ```
     rosservice call /start_dynamic_graph
 ```
 The latter command asks the `sot_controller` to start taking into account
-signal `robot.device.control` to compute the reference configuration of the
-robot.
+signal `robot.integrator.signal("velocity")` to compute the reference
+configuration of the robot.
 
+You can now set a non zero velocity by typing in the remote python terminal
+```
+u[0] = 0.01
+robot.integrator.signal("velocity").value = u
+```
 As a consequence, you should see the robot moving the first axis in Gazebo.
 
 To stop the motion, type the following commands in the remote python terminal:
 ```
-    u = numpy.zeros(6)
-    robot.device.control.value = u
+u = numpy.zeros(6)
+robot.integrator.signal("velocity").value = u
 ```
 
 ### A simple control graph
@@ -117,7 +115,7 @@ signal to compute the error:
     from dynamic_graph import plug
     from dynamic_graph.sot.core.operator import Substract_of_vector
     error = Substract_of_vector('error')
-    plug(robot.device.state, error.sin1)
+    plug(robot.integrator.signal("configuration"), error.sin1)
     error.sin2.value = numpy.array([pi/6, -pi/2, pi/2, 0, 0, 0,])
 ```
 Then we will multiply this error by a negative gain that we will plug into
@@ -127,12 +125,12 @@ the device control signal:
     control = Multiply_double_vector('control')
     control.sin1.value = -0.01
     plug(error.sout, control.sin2)
-    plug(control.sout, robot.device.control)
+    plug(control.sout, robot.integrator.signal("velocity"))
 ```
 After typing the last line, the robot starts moving to the desired
 configuration. To display the current configuration, type:
 ```
-    robot.device.state.value
+    robot.device.robotState.value
 ```
 To display the current error, type:
 ```
@@ -154,7 +152,7 @@ Then in a bash terminal:
 ```
 This will produce a svg file representing the control graph as below
 
-![Very simple control graph.](figures/simple-control-graph.svg)
+![Simple control graph. The 'control' entity computes a desired velocity for the robot. This velocity is integrated to get a desired configuration. The desired configuration is fed as input to 'ur_selector' that extracts the actuated joints and send them to 'robotArm'. The latter makes the interface with roscontrol. Note that for humanoid robots of robot arm with a gripper not controlled via roscontrol, the dimension of the configuration is different from the dimension of the control input vector of 'RobotArm'.'ur_dynamic' computes the forward kinematics. It is not used in the example.](figures/simple-control-graph.svg)
 
 ### Performing inverse kinematics
 
@@ -268,7 +266,7 @@ sot.push(t.name)
 ```
 Then, we can plug the control signal of the SOT instance to the input of the device
 ```
-plug(sot.signal('control'), robot.device.signal('control'))
+plug(sot.signal('control'), robot.integrator.signal('velocity'))
 ```
 
 Again, to activate the control graph, run command

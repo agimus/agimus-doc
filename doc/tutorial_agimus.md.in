@@ -15,23 +15,20 @@ roslaunch agimus_demos ur10_pointing_simulation.launch part:=april-tag-plank par
 ```
 Argument `part_pose` specifies the pose of the part in the simulator: translation of 1.3 m along x, -15 cm along y, and rotation of pi around z axis (Y stands for yaw).
 
-In terminal 2, start `hpp`:
+In terminal 2, start agimus
+```
+roslaunch agimus_demos ur10_pointing_demo.launch simulation:=true part:=april-tag-plank
+```
+
+In terminal 3, start `hpp`:
 ```
 hppcorbaserver
 ```
-In terminal 3,
+In terminal 4,
 ```
 gepetto-gui
 ```
-In `script_hpp.py` replace the following line
-```
-UseAprilTagPlank = False
-```
-by
-```
-UseAprilTagPlank = True
-```
-then execute the script in terminal 4.
+In terminal 5
 ```
 python -i script_hpp.py
 ```
@@ -51,11 +48,6 @@ gepetto-gui</div>
 You can go now to <a href="tutorial_gepetto-gui.html">this page</a> to know how to use `gepetto-gui`.
 
 ## Building a control graph with agimus-sot
-
-In terminal 5, start agimus
-```
-roslaunch agimus_demos ur10_pointing_demo.launch simulation:=true part:=april-tag-plank
-```
 
 In terminal 6
 ```
@@ -78,9 +70,11 @@ This will create a dot file corresponding to the following graph.
 
 Let us explain the components of this control graph.
 
-  - `UniversalRobot` is the `Device` entity that make the interface to the hardware. It is also accessible in the remote python interpreter via `robot.device`.
+  - `RobotArm` is the `Device` entity that makes the interface to the hardware. It is also accessible in the remote python interpreter via `robot.device`. The input signal `control` receives the joint angles to send to the robot.
+  - `ur_selector` extracts from the configuration vector of the robot the components corresponding to joints controlled via `roscontrol`. If the robot has a gripper described in the URDF file, but not controlled by `roscontrol`, the corresponding components of the configuration will be removed.
+  - `ur_integrator` integrates the velocity computed by the Stack of Task and provides the desired configuration as output.
   - `ur_dynamic` is the entity of type `DynamicPinocchio` that computes the forward kinematics of the robot.
-  - Entity `sot_supervisor_switch` selects among many input signals one that is provided as output. The output signal `sout` is plugged to the input signal `control` of the device. This entity is aimed as selecting the controller depending on the transition of the constraint graph that is active.
+  - Entity `sot_supervisor_switch` selects among many input signals one that is provided as output. The output signal `sout` is plugged to the input signal `velocity` of the integrator. This entity is aimed as selecting the controller depending on the transition of the constraint graph that is active.
   - All entities with a name starting with `sot_` are controllers of type `SOT` as the one we defined in <a href="tutorial_sot.html"> tutorial "Control of a UR10 robot using the Stack of Tasks"</a>. Note that `sot_keep` is the controller active when no trajectory is executed.
   - All entities with a name starting with `preAction_` correspond to entities of type `SOT` that are aimed at controlling an action that takes place before a transition. For instance closing a gripper before grasping an object.
   - All entities with a name starting with `postAction_` correspond to entities of type `SOT` that are aimed at controlling an action that takes place after a transition. For instance opening a gripper after putting an object on a contact surface.

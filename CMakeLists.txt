@@ -57,3 +57,5 @@ CONFIGURE_FILE (doc/tutorial_gepetto-gui.md.in ${CMAKE_BINARY_DIR}/doc/tutorial_
 CONFIGURE_FILE (doc/figures/talos-manipulate-boxes-geometric-simu.launch.dot.in
   ${CMAKE_BINARY_DIR}/doc/figures/talos-manipulate-boxes-geometric-simu.launch.dot
   @ONLY)
+INSTALL(FILES doc/figures/apriltag-plank-control-graph.svg
+  DESTINATION ${CMAKE_INSTALL_DATAROOTDIR}/doc/agimus-doc/doxygen-html)
