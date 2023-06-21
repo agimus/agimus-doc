@@ -25,32 +25,11 @@
 // STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
 // OF THE POSSIBILITY OF SUCH DAMAGE.
-
 /// \mainpage Agimus: a framework for manipulation motion planning and control.
 ///
-/// \section agimus_doc_sec_intro Introduction
+/// \page page_overview
 ///
-/// \c Agimus is a framework aimed at integrating motion planning and
-/// motion control of manipulation tasks for a wide variety of robots.
-/// The computation pipeline is composed of several steps
-///
-/// \li A motion is planned based on a model of the robot, environment
-/// and objects to grasp, the result is a sequence of manipulation
-/// motions. Along each segment of the motion, a set of constraints is
-/// active (object grasped by a gripper, object still in a stable
-/// pose). This step is performed by the software platform HPP
-/// (Humanoid Path Planner), running in an executable that implements
-/// a CORBA server. To trigger path planning and get solution paths, a
-/// <a href="@HPP_MANIPULATION_CORBA_DOXYGENDOCDIR@/index.html">
-/// CORBA client</a> is run in a ROS node.
-///
-/// \li For each segment of the motion, a controller is created in the
-/// Stack of Tasks framework. This step is produced by package
-/// <a href="@AGIMUS_SOT_DOXYGENDOCDIR@/index.html"> \c agimus-sot </a>.
-/// Reference motions for each task is extracted from the planned trajectory
-/// by <a href="@AGIMUS_HPP_DOXYGENDOCDIR@/index.html">agimus-hpp</a>.
-///
-/// \li A finite state machine switch from one controller to the next
-///  one.  This finite state machine is implemented in package
-///  <a href="@AGIMUS_PREFIX@/share/doc/agimus/doxygen-html/index.html"> \c agimus </a>.
-///
+/// \page Tutorial_Pages Tutorials
+///  - \subpage tutorial_sot
+///  - \subpage tutorial_agimus
+///  - \subpage tutorial_gepetto-gui
